@@ -12,7 +12,7 @@ in_dir = "prime_numbers"
 data = "data"
 
 from_number = 2
-to_number = 11
+count_number = 1000
 
 def simplify_data(in_dir, out_dir):
     i = 0
@@ -130,7 +130,7 @@ def testGetXY(n):
         return;
     points = generate_spiral2(n)
     for i in xrange(n):
-        r = numberToVector(i+1)
+        r = Vector.__numberToVector__(i+1)
         if r[0] != points[i][0] or r[1] != points[i][1]:
             print 'number',i + 1,'get',r,'from spiral', points[i]
 def testGetXYv2(n):
@@ -140,7 +140,7 @@ def testGetXYv2(n):
 
     i = 2
     while i < n:
-        r = numberToVector(i)
+        r = Vector.__numberToVector__(i)
         if r[0] != lastX or r[1] != lastY:
             print 'number',i,'get',r,'from spiral', [lastX, lastY]
 
@@ -160,77 +160,181 @@ def testGetXYv2(n):
             dirn = [0, 1]
 
         i += 1
-    print numberToVector(i)
+    print Vector.__numberToVector__(i)
 #simplify_data(in_dir, data)
 #testGetXYv2(10**1)
 
-def numberToVector(number):  #tested to 1.0 mln
-    if number == 1:
+class Line:
+    def __init__(self, A = None, B = None, C = None):
+        self.A = A
+        self.B = B
+        self.C = C
+        if self.A == 0 and self.B == 0:
+            raise Exception('A == 0 and B == 0')
+    def __str__(self):
+        return str(self.A) + "*x + " + str(self.B) + "*y + " + str(self.C) + " = 0"
+    def __repr__(self):
+        return self.__str__()
+
+    def calcDistance(self, x0, y0):
+        return abs(1.0 * self.A * x0 + self.B * y0 + self.C) / math.sqrt(self.A ** 2 + self.B ** 2)
+
+    def calcValue(self, x):
+        return (self.A * x + self.C) / self.B
+
+class Vector:
+    def __init__(self, number):
+        self.x1, self.y1 = Vector.__numberToVector__(number)
+
+    def __str__(self):
+        return "[" +str(self.x1) + ", " + str(self.y1) + "]"
+    def __repr__(self):
+        return self.__str__()
+
+    def __countMatchingLine__(self):
+        if self.x1 > 0:
+            self.line = Line(1, -1, self.y1 - self.x1)
+        else:
+            self.line = Line(-1, -1, self.y1 + self.x1)
+
+    @staticmethod
+    def __numberToVector__(number):  #tested to 1.0 mln
+        if number == 1:
+            return 0,0
+
+        n = math.ceil(math.sqrt((number-1)/4.0))
+        right_mid = 4*n**2 - 3*n + 1
+        top = 4*n**2 - n + 1
+
+        if abs(right_mid - number) < n:
+            return n, number - right_mid
+
+        if abs(top - number) <= n:
+            return  top - number, n
+
+        n = math.floor(math.sqrt((number-1)/4.0))
+        left_mid = 4*n**2 + n + 1
+        bottom = 4*n**2 + 3* n + 1
+
+        if abs(left_mid - number) <= n:
+            return -n, left_mid - number
+
+        if abs(bottom - number) <= n:
+            return number - bottom, -n
+
+        print "--------"
+        print number, 'n ceil', math.ceil(math.sqrt((number-1)/4.0)), 'n floor',math.floor(math.sqrt((number-1)/4.0))
+        print "bottom", bottom
+        print "left_mid", left_mid
+        print "top", top
+        print "right_mid",right_mid
         return 0,0
 
-    n = math.ceil(math.sqrt((number-1)/4.0))
-    right_mid = 4*n**2 - 3*n + 1
-    top = 4*n**2 - n + 1
+    @staticmethod
+    def createMainVector(number):
+        v = Vector(number)
+        v.__countMatchingLine__()
+        return v
 
-    if abs(right_mid - number) < n:
-        return n, number - right_mid
+    def getVectors(self, vec):
+        return self.getVectors2(vec.x1, vec.y1)
 
-    if abs(top - number) <= n:
-        return  top - number, n
+    def getVectors2(self, x0, y0):
+        distBeetweenPointAndLine = self.line.calcDistance(x0,y0)
+        distBetweenPoints = math.sqrt((x0 - self.x1)**2 + (y0 - self.y1)**2)
+        dist = math.sqrt(distBetweenPoints**2 - distBeetweenPointAndLine**2)
+        if y0 >= self.line.calcValue(x0):
+            return [dist, distBeetweenPointAndLine]
+        else:
+            return [dist, -distBeetweenPointAndLine]
 
-    n = math.floor(math.sqrt((number-1)/4.0))
-    left_mid = 4*n**2 + n + 1
-    bottom = 4*n**2 + 3* n + 1
+    def getLength(self):
+        return math.sqrt(self.x1**2 + self.y1**2)
 
-    if abs(left_mid - number) <= n:
-        return -n, left_mid - number
+class Presentation:
+    def __init__(self):
+        self.dir = "result/start_time_" + time.strftime("%Y.%m.%d %H.%M.%S") + "/"
+        os.makedirs(self.dir)
+        self.plotNumber = 1
 
-    if abs(bottom - number) <= n:
-        return number - bottom, -n
+    def create_plot(self, x, y, title, xTitle, yTitle):
+        plt.hold(True)
+        plt.ion()
+        figure = plt.figure()
+        plt.scatter(x, y, s=0.1)
+        plt.grid(True)
+        plt.title(title)
+        plt.ylabel(yTitle)
+        plt.xlabel(xTitle)
+       # plt.axis([-1, 2, -2, 2]) # [x0, x1, y0, y1]
+        plt.savefig(self.dir + '/out' +str(self.plotNumber) + '_' + time.strftime("%Y.%m.%d %H.%M.%S") + '.png')
+        self.plotNumber += 1
+        #plt.draw()
+        return figure
 
-    print "--------"
-    print number, 'n ceil', math.ceil(math.sqrt((number-1)/4.0)), 'n floor',math.floor(math.sqrt((number-1)/4.0))
-    print "bottom", bottom
-    print "left_mid", left_mid
-    print "top", top
-    print "right_mid",right_mid
-    return 0,0
-
-def create_plot(x, y):
-    plt.hold(True)
-    plt.ion()
-    plt.figure()
-    plt.plot(x, y, 'ro')
-    plt.grid(True)
-    plt.title('title')
-    plt.ylabel('yTitle')
-    plt.xlabel('xTitle')
-    plt.axis([0, 7, 0, 6]) # [x0, x1, y0, y1]
-    plt.savefig('result/out_' + time.strftime("%Y.%m.%d %H.%M.%S") + '.png')
-    plt.draw()
-
-def update_plot(x, y):
-    plt.plot(x, y, 'ro')
-    plt.draw()
+    def update_plot(self,x, y):
+        plt.plot(x, y, 'ro')
+        plt.savefig(self.dir + '/out_' + time.strftime("%Y.%m.%d %H.%M.%S") + '.png')
+        plt.draw()
 
 def work():
     x = [1,2,3,4]
     y = [1,2,3,4]
-    create_plot(x, y)
+
+    p = Presentation()
+    p.create_plot(x, y, 'title', 'xtitle','ytitle')
     time.sleep( 1 )
 
-    update_plot([5],[5])
+    p.update_plot([5],[5])
     plt.ioff()
     #time.sleep(5)
+
+def gen_stats(count):
+    file = open("data/primes1.txt");
+
+    dataDistOnLine = []
+    dataDistFromLine = []
+    dataLenVecRsa = []
+
+    primes = []
+    for _ in xrange(count):
+        for nr in file.readline().split(";"):
+            if nr != '\n':
+                primes.append(int(nr))
+
+    for i in xrange(len(primes)):
+        vecPrime1 = Vector(primes[i])
+        for j in xrange(i, len(primes)):
+            vecPrime2 = Vector(primes[j])
+            rsa = primes[i] * primes[j]
+            vecRsa = Vector.createMainVector(rsa)
+
+            distOnLine, distFromLine = vecRsa.getVectors(vecPrime1)
+            dataDistOnLine.append((1.0 * distOnLine) / vecRsa.getLength())
+            dataDistFromLine.append((1.0 * distFromLine) / vecRsa.getLength())
+            dataLenVecRsa.append(vecRsa.getLength())
+
+            distOnLine, distFromLine = vecRsa.getVectors(vecPrime2)
+            dataDistOnLine.append((1.0 * distOnLine) / vecRsa.getLength())
+            dataDistFromLine.append((1.0 * distFromLine) / vecRsa.getLength())
+            dataLenVecRsa.append(vecRsa.getLength())
+
+    # print len(dataDistOnLine)
+    # print len(dataDistFromLine)
+
+    p = Presentation()
+    p.create_plot(dataDistOnLine, dataDistFromLine, 'title', 'Len on line / len(vecRsa)', 'Len from line / len(vecRsa)')
+    p.create_plot(dataLenVecRsa, dataDistFromLine, 'title', 'len(vecRsa)', 'Len from line ')
+    p.create_plot(dataLenVecRsa, dataDistOnLine, 'title', 'len(vecRsa)', 'Len on line')
+
 
 #checkQuadrick('left_bottom')
 # start = time.time() # in sec
 # print "work time","%.5f" % (float(time.time()) - start),"[s]"
 
 
-
-
-
+gen_stats(100)
+#time.sleep( 10 )
 
 
 

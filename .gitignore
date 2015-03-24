@@ -1,3 +1,13 @@
+# my
+.idea/*
+prime_numbers/*
+result/*
+data/*
+!data/primes1.txt
+!data/primes2.txt
+!data/primes3.txt
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

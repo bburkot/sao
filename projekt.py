@@ -12,7 +12,6 @@ in_dir = "prime_numbers"
 data = "data"
 
 from_number = 2
-
 to_number = 11
 
 def simplify_data(in_dir, out_dir):
@@ -31,44 +30,57 @@ def simplify_data(in_dir, out_dir):
             except ValueError:
                 pass
         out.close()
-#simplify_data(in_dir, data)
+def generate_spiral(n):
+    """ Return the first n coordinates in the Ulam spiral.  Note that
+        (xs[i], ys[i]) is the location of the integer i+1 (i.e. 1 is located
+        at (xs[0], ys[0])).
+        """
 
-hl = None
+    dirn = [0, 1] # The direction the spiral is traveling: [dX, dY]
+    xs = [0, 1]
+    ys = [0, 0]
 
-xdata = []
-ydata = []
+    for i in range(2, n):
+        # Compute new coordinates
+        x = xs[-1] + dirn[0]
+        y = ys[-1] + dirn[1]
 
-def create_plot(x, y):
-    plt.hold(True)
-    plt.ion()
-    plt.figure()
-    plt.plot(x, y, 'ro')
-    plt.grid(True)
-    plt.title('title')
-    plt.ylabel('yTitle')
-    plt.xlabel('xTitle')
-    plt.axis([0, 7, 0, 6]) # [x0, x1, y0, y1]
-    plt.savefig('result/out_' + time.strftime("%Y.%m.%d %H.%M.%S") + '.png')
-    plt.draw()
+        # Add to spiral
+        xs.append(x)
+        ys.append(y)
 
-def update_plot(x, y):
-    plt.plot(x, y, 'ro')
-    plt.draw()
+        # Change direction at the 45-degree lines (except SE line, which is
+        # one unit past).  Draw it if you're trying to visualize...
+        if x == y and x > 0:
+            dirn = [-1, 0]
+        elif -1 * x == y and x < 0:
+            dirn = [0, -1]
+        elif x == y and x < 0:
+            dirn = [1, 0]
+        elif x - 1 == -1 * y and x > 0:
+            dirn = [0, 1]
 
-def numberToVector(nr):
+    return xs, ys
+def generate_spiral2(n):
+    dirn = [0, 1] # The direction the spiral is traveling: [dX, dY]
+    points = [[0,0],[1,0]]
+    for i in xrange(2, n):
+        # Compute new coordinates
+        x = points[-1][0] + dirn[0]
+        y = points[-1][1] + dirn[1]
 
-    pass
+        points.append([x, y])
 
-def work():
-    x = [1,2,3,4]
-    y = [1,2,3,4]
-    create_plot(x, y)
-    time.sleep( 1 )
+        if x == y and x > 0:
+            dirn = [-1, 0]
+        elif -1 * x == y and x < 0:
+            dirn = [0, -1]
+        elif x == y and x < 0:
+            dirn = [1, 0]
+        elif x - 1 == -1 * y and x > 0:
+            dirn = [0, 1]
 
-    update_plot([5],[5])
-    plt.ioff()
-    #time.sleep(5)
-
+    return points
 def checkQuadrick(key):
     structs = {
         'right_top' : {
@@ -113,8 +125,46 @@ def checkQuadrick(key):
     for x in xrange(len(y)):
         if y[x] != a*(x**2) + b*x + c:
             print "rozne dla", x, "powinno byc", y[x],"a jest", a*(x**2) + b*x + c
+def testGetXY(n):
+    if n < 2:
+        return;
+    points = generate_spiral2(n)
+    for i in xrange(n):
+        r = numberToVector(i+1)
+        if r[0] != points[i][0] or r[1] != points[i][1]:
+            print 'number',i + 1,'get',r,'from spiral', points[i]
+def testGetXYv2(n):
+    dirn = [0, 1] # The direction the spiral is traveling: [dX, dY]
+    lastX = 1
+    lastY = 0
 
-def getXY(number):  #tested to 1.0 mln
+    i = 2
+    while i < n:
+        r = numberToVector(i)
+        if r[0] != lastX or r[1] != lastY:
+            print 'number',i,'get',r,'from spiral', [lastX, lastY]
+
+        x = lastX + dirn[0]
+        y = lastY + dirn[1]
+
+        lastX = x
+        lastY = y
+
+        if x == y and x > 0:
+            dirn = [-1, 0]
+        elif -1 * x == y and x < 0:
+            dirn = [0, -1]
+        elif x == y and x < 0:
+            dirn = [1, 0]
+        elif x - 1 == -1 * y and x > 0:
+            dirn = [0, 1]
+
+        i += 1
+    print numberToVector(i)
+#simplify_data(in_dir, data)
+#testGetXYv2(10**1)
+
+def numberToVector(number):  #tested to 1.0 mln
     if number == 1:
         return 0,0
 
@@ -146,112 +196,40 @@ def getXY(number):  #tested to 1.0 mln
     print "right_mid",right_mid
     return 0,0
 
+def create_plot(x, y):
+    plt.hold(True)
+    plt.ion()
+    plt.figure()
+    plt.plot(x, y, 'ro')
+    plt.grid(True)
+    plt.title('title')
+    plt.ylabel('yTitle')
+    plt.xlabel('xTitle')
+    plt.axis([0, 7, 0, 6]) # [x0, x1, y0, y1]
+    plt.savefig('result/out_' + time.strftime("%Y.%m.%d %H.%M.%S") + '.png')
+    plt.draw()
+
+def update_plot(x, y):
+    plt.plot(x, y, 'ro')
+    plt.draw()
+
+def work():
+    x = [1,2,3,4]
+    y = [1,2,3,4]
+    create_plot(x, y)
+    time.sleep( 1 )
+
+    update_plot([5],[5])
+    plt.ioff()
+    #time.sleep(5)
+
 #checkQuadrick('left_bottom')
 # start = time.time() # in sec
 # print "work time","%.5f" % (float(time.time()) - start),"[s]"
 
-def generate_spiral(n):
-    """ Return the first n coordinates in the Ulam spiral.  Note that
-        (xs[i], ys[i]) is the location of the integer i+1 (i.e. 1 is located
-        at (xs[0], ys[0])).
-        """
-
-    dirn = [0, 1] # The direction the spiral is traveling: [dX, dY]
-    xs = [0, 1]
-    ys = [0, 0]
-
-    for i in range(2, n):
-        # Compute new coordinates
-        x = xs[-1] + dirn[0]
-        y = ys[-1] + dirn[1]
-
-        # Add to spiral
-        xs.append(x)
-        ys.append(y)
-
-        # Change direction at the 45-degree lines (except SE line, which is
-        # one unit past).  Draw it if you're trying to visualize...
-        if x == y and x > 0:
-            dirn = [-1, 0]
-        elif -1 * x == y and x < 0:
-            dirn = [0, -1]
-        elif x == y and x < 0:
-            dirn = [1, 0]
-        elif x - 1 == -1 * y and x > 0:
-            dirn = [0, 1]
-
-    return xs, ys
-
-def generate_spiral2(n):
-    dirn = [0, 1] # The direction the spiral is traveling: [dX, dY]
-    points = [[0,0],[1,0]]
-    for i in xrange(2, n):
-        # Compute new coordinates
-        x = points[-1][0] + dirn[0]
-        y = points[-1][1] + dirn[1]
-
-        points.append([x, y])
-
-        if x == y and x > 0:
-            dirn = [-1, 0]
-        elif -1 * x == y and x < 0:
-            dirn = [0, -1]
-        elif x == y and x < 0:
-            dirn = [1, 0]
-        elif x - 1 == -1 * y and x > 0:
-            dirn = [0, 1]
-
-    return points
-
-def testGetXY(n):
-    if n < 2:
-        return;
-    points = generate_spiral2(n)
-    for i in xrange(n):
-        r = getXY(i+1)
-        if r[0] != points[i][0] or r[1] != points[i][1]:
-            print 'number',i + 1,'get',r,'from spiral', points[i]
-
-def testGetXYv2(n):
-    dirn = [0, 1] # The direction the spiral is traveling: [dX, dY]
-    lastX = 1
-    lastY = 0
-
-    i = 2
-    while i < n:
-        r = getXY(i)
-        if r[0] != lastX or r[1] != lastY:
-            print 'number',i,'get',r,'from spiral', [lastX, lastY]
-
-        x = lastX + dirn[0]
-        y = lastY + dirn[1]
-
-        lastX = x
-        lastY = y
-
-        if x == y and x > 0:
-            dirn = [-1, 0]
-        elif -1 * x == y and x < 0:
-            dirn = [0, -1]
-        elif x == y and x < 0:
-            dirn = [1, 0]
-        elif x - 1 == -1 * y and x > 0:
-            dirn = [0, 1]
-
-        i += 1
-    print getXY(i)
-
-testGetXY(10**9)
 
 
 
-# while True:
-#     try:
-#         nr = int(raw_input(">"))
-#         ret = getXY(nr)
-#         print "[X,Y]", ret
-#     except ValueError:
-#         print "pass"
 
 
 

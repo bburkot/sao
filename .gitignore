@@ -6,7 +6,7 @@ data/*
 !data/primes1.txt
 !data/primes2.txt
 !data/primes3.txt
-
+primes.db
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

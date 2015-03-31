@@ -7,162 +7,39 @@ import matplotlib.pyplot as plt
 import time
 import numpy
 import math
+import sqlite3
 
-in_dir = "prime_numbers"
-data = "data"
+db_name = "primes.db"
 
-from_number = 2
-count_number = 1000
 
-def simplify_data(in_dir, out_dir):
-    i = 0
-    for filename in os.listdir(in_dir):
-        out = open(out_dir + "/" + filename, "w")
-        for line in open(in_dir + "/" + filename):
-            try:
-                oLine = ""
-                for number in line.split():
-                    oLine = oLine + str(int(number)) + ";"
+def createDB():
+    conn = sqlite3.connect(db_name)
+    conn.execute("CREATE TABLE PRIMES (ID INTEGER PRIMARY KEY AUTOINCREMENT, PRIME INTEGER NOT NULL);")
+    for nr in xrange(1,51):
+        file = open("data/primes%d.txt" % nr);
+        for line in file:
+            for nr in line.split(";"):
+                if nr != '\n':
+                    conn.execute("INSERT INTO PRIMES (PRIME) VALUES (" + nr + ")");
+        conn.commit()
 
-                if len(oLine) > 0:
-                    out.write(oLine)
-                    out.write("\n")
-            except ValueError:
-                pass
-        out.close()
-def generate_spiral(n):
-    """ Return the first n coordinates in the Ulam spiral.  Note that
-        (xs[i], ys[i]) is the location of the integer i+1 (i.e. 1 is located
-        at (xs[0], ys[0])).
-        """
+    cursor = conn.execute("SELECT count(*) FROM primes ")
+    print cursor.fetchone()[0]
 
-    dirn = [0, 1] # The direction the spiral is traveling: [dX, dY]
-    xs = [0, 1]
-    ys = [0, 0]
+    conn.close()
 
-    for i in range(2, n):
-        # Compute new coordinates
-        x = xs[-1] + dirn[0]
-        y = ys[-1] + dirn[1]
+def getPrimes(fromNumber, toNumber=None):
+    global conn
+    if toNumber == None:
+        cursor = conn.execute("SELECT prime FROM primes WHERE id = :id", {'id' : fromNumber})
+        return cursor.fetchone()[0]
+    else:
+        primes = []
+        cursor = conn.execute("SELECT prime FROM primes WHERE id >= :from and id <= :to", {'from' : fromNumber, "to" : toNumber})
+        for row in cursor:
+            primes.append(row[0])
+        return primes
 
-        # Add to spiral
-        xs.append(x)
-        ys.append(y)
-
-        # Change direction at the 45-degree lines (except SE line, which is
-        # one unit past).  Draw it if you're trying to visualize...
-        if x == y and x > 0:
-            dirn = [-1, 0]
-        elif -1 * x == y and x < 0:
-            dirn = [0, -1]
-        elif x == y and x < 0:
-            dirn = [1, 0]
-        elif x - 1 == -1 * y and x > 0:
-            dirn = [0, 1]
-
-    return xs, ys
-def generate_spiral2(n):
-    dirn = [0, 1] # The direction the spiral is traveling: [dX, dY]
-    points = [[0,0],[1,0]]
-    for i in xrange(2, n):
-        # Compute new coordinates
-        x = points[-1][0] + dirn[0]
-        y = points[-1][1] + dirn[1]
-
-        points.append([x, y])
-
-        if x == y and x > 0:
-            dirn = [-1, 0]
-        elif -1 * x == y and x < 0:
-            dirn = [0, -1]
-        elif x == y and x < 0:
-            dirn = [1, 0]
-        elif x - 1 == -1 * y and x > 0:
-            dirn = [0, 1]
-
-    return points
-def checkQuadrick(key):
-    structs = {
-        'right_top' : {
-            'values':[1,3,13,31,57,91,133,183,241,307,381],
-            'a': 4, 'b':-2, 'c':1
-        },
-        'right_mid':{
-            'values':[1,2,11,28,53,86,127,176,233,298,371],
-            'a': 4, 'b':-3, 'c':1
-        },
-        'right_bottom' : {
-            'values':[1,9,25,49,81,121,169,225,289,361,441],
-            'a': 4, 'b':4, 'c':1
-        },
-        'left_top' : {
-            'values':[1,5,17,37,65,101,145,197,257,325,401],
-            'a': 4, 'b':0, 'c':1
-        },
-        'left_mid' : {
-            'values':[1,6,19,40,69,106,151,204,265,334,411],
-            'a': 4, 'b':1, 'c':1
-        },
-        'left_bottom' : {
-            'values':[1,7,21,43,73,111,157,211,273,343,421],
-            'a': 4, 'b':2, 'c':1
-        },
-        'y_top' : {
-            'values':[1,4,15,34,61,96,139,190],
-            'a': 4, 'b':-1, 'c':1
-        },
-        'y_bottom' : {
-            'values':[1,8,23,46,77,116,163,218,281,352,431],
-            'a': 4, 'b':3, 'c':1
-        },
-    }
-
-    y = structs[key]['values']
-    a = structs[key]['a']
-    b = structs[key]['b']
-    c = structs[key]['c']
-
-    for x in xrange(len(y)):
-        if y[x] != a*(x**2) + b*x + c:
-            print "rozne dla", x, "powinno byc", y[x],"a jest", a*(x**2) + b*x + c
-def testGetXY(n):
-    if n < 2:
-        return;
-    points = generate_spiral2(n)
-    for i in xrange(n):
-        r = Vector.__numberToVector__(i+1)
-        if r[0] != points[i][0] or r[1] != points[i][1]:
-            print 'number',i + 1,'get',r,'from spiral', points[i]
-def testGetXYv2(n):
-    dirn = [0, 1] # The direction the spiral is traveling: [dX, dY]
-    lastX = 1
-    lastY = 0
-
-    i = 2
-    while i < n:
-        r = Vector.__numberToVector__(i)
-        if r[0] != lastX or r[1] != lastY:
-            print 'number',i,'get',r,'from spiral', [lastX, lastY]
-
-        x = lastX + dirn[0]
-        y = lastY + dirn[1]
-
-        lastX = x
-        lastY = y
-
-        if x == y and x > 0:
-            dirn = [-1, 0]
-        elif -1 * x == y and x < 0:
-            dirn = [0, -1]
-        elif x == y and x < 0:
-            dirn = [1, 0]
-        elif x - 1 == -1 * y and x > 0:
-            dirn = [0, 1]
-
-        i += 1
-    print Vector.__numberToVector__(i)
-#simplify_data(in_dir, data)
-#testGetXYv2(10**1)
 
 class Line:
     def __init__(self, A = None, B = None, C = None):
@@ -277,30 +154,13 @@ class Presentation:
         plt.savefig(self.dir + '/out_' + time.strftime("%Y.%m.%d %H.%M.%S") + '.png')
         plt.draw()
 
-def work():
-    x = [1,2,3,4]
-    y = [1,2,3,4]
-
-    p = Presentation()
-    p.create_plot(x, y, 'title', 'xtitle','ytitle')
-    time.sleep( 1 )
-
-    p.update_plot([5],[5])
-    plt.ioff()
-    #time.sleep(5)
-
 def gen_stats(count):
-    file = open("data/primes1.txt");
 
     dataDistOnLine = []
     dataDistFromLine = []
     dataLenVecRsa = []
 
-    primes = []
-    for _ in xrange(count):
-        for nr in file.readline().split(";"):
-            if nr != '\n':
-                primes.append(int(nr))
+    primes = getPrimes(1, count)
 
     for i in xrange(len(primes)):
         vecPrime1 = Vector(primes[i])
@@ -309,11 +169,13 @@ def gen_stats(count):
             rsa = primes[i] * primes[j]
             vecRsa = Vector.createMainVector(rsa)
 
+            #prime 1
             distOnLine, distFromLine = vecRsa.getVectors(vecPrime1)
             dataDistOnLine.append((1.0 * distOnLine) / vecRsa.getLength())
             dataDistFromLine.append((1.0 * distFromLine) / vecRsa.getLength())
             dataLenVecRsa.append(vecRsa.getLength())
 
+            #prime 2
             distOnLine, distFromLine = vecRsa.getVectors(vecPrime2)
             dataDistOnLine.append((1.0 * distOnLine) / vecRsa.getLength())
             dataDistFromLine.append((1.0 * distFromLine) / vecRsa.getLength())
@@ -324,17 +186,21 @@ def gen_stats(count):
 
     p = Presentation()
     p.create_plot(dataDistOnLine, dataDistFromLine, 'title', 'Len on line / len(vecRsa)', 'Len from line / len(vecRsa)')
-    p.create_plot(dataLenVecRsa, dataDistFromLine, 'title', 'len(vecRsa)', 'Len from line ')
-    p.create_plot(dataLenVecRsa, dataDistOnLine, 'title', 'len(vecRsa)', 'Len on line')
+    p.create_plot(dataLenVecRsa, dataDistFromLine, 'title', 'len(vecRsa)', 'Len from line / len(vecRsa)')
+    p.create_plot(dataLenVecRsa, dataDistOnLine, 'title', 'len(vecRsa)', 'Len on line / len(vecRsa)')
+
+conn = sqlite3.connect(db_name)
+
+print getPrimes(2)  # zwraca drugą liczbę pierwszą (pierwsza to 2, druga to 3 itd.
+print getPrimes(1,10) # zwraca od 1-szej do 10-tej liczby pierwszej
 
 
-#checkQuadrick('left_bottom')
 # start = time.time() # in sec
 # print "work time","%.5f" % (float(time.time()) - start),"[s]"
 
-
-gen_stats(100)
+gen_stats(20) # PS zwróć uwagę że są jakieś wzorki na wykresach
 #time.sleep( 10 )
 
+conn.close()
 
 

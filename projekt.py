@@ -156,51 +156,48 @@ class Presentation:
 
 def gen_stats(count):
 
-    dataDistOnLine = []
-    dataDistFromLine = []
-    dataLenVecRsa = []
+    dataLenOfTheRSANumber = []
+    dataDistFirstNumber = []
+    dataDistSecondNumber = []
 
     primes = getPrimes(1, count)
 
     for i in xrange(len(primes)):
         vecPrime1 = Vector(primes[i])
-        for j in xrange(i, len(primes)):
+        for j in xrange(i+1, len(primes)):
             vecPrime2 = Vector(primes[j])
             rsa = primes[i] * primes[j]
-            vecRsa = Vector.createMainVector(rsa)
+            if numpy.absolute(numpy.log2(primes[i]) - numpy.log2(primes[j])) < 1:
+                vecRsa = Vector.createMainVector(rsa)
+                vesRsaPrime = Vector.createMainVector(math.sqrt(rsa))
 
-            #prime 1
-            distOnLine, distFromLine = vecRsa.getVectors(vecPrime1)
-            dataDistOnLine.append((1.0 * distOnLine) / vecRsa.getLength())
-            dataDistFromLine.append((1.0 * distFromLine) / vecRsa.getLength())
-            dataLenVecRsa.append(vecRsa.getLength())
+                #RSA number
+                #dataLenOfTheRSANumber.append(numpy.log2(rsa))
+                dataLenOfTheRSANumber.append(numpy.log2(rsa))
 
-            #prime 2
-            distOnLine, distFromLine = vecRsa.getVectors(vecPrime2)
-            dataDistOnLine.append((1.0 * distOnLine) / vecRsa.getLength())
-            dataDistFromLine.append((1.0 * distFromLine) / vecRsa.getLength())
-            dataLenVecRsa.append(vecRsa.getLength())
+                #prime 1 todo
+                distOnLine, distFromLine = vesRsaPrime.getVectors(vecPrime1)
+                dataDistFirstNumber.append(distFromLine)
 
-    # print len(dataDistOnLine)
-    # print len(dataDistFromLine)
+                #prime 2 todo
+                distOnLine, distFromLine = vesRsaPrime.getVectors(vecPrime2)
+                dataDistSecondNumber.append(distFromLine)
 
     p = Presentation()
-    p.create_plot(dataDistOnLine, dataDistFromLine, 'title', 'Len on line / len(vecRsa)', 'Len from line / len(vecRsa)')
-    p.create_plot(dataLenVecRsa, dataDistFromLine, 'title', 'len(vecRsa)', 'Len from line / len(vecRsa)')
-    p.create_plot(dataLenVecRsa, dataDistOnLine, 'title', 'len(vecRsa)', 'Len on line / len(vecRsa)')
+    p.create_plot(dataLenOfTheRSANumber, dataDistFirstNumber, 'title', 'Len of RSA number in bits', 'Distance from line first number')
+    p.create_plot(dataLenOfTheRSANumber, dataDistSecondNumber, 'title', 'Len of RSA number in bits', 'Distance from line second number')
 
 conn = sqlite3.connect(db_name)
 
-print getPrimes(2)  # zwraca drugą liczbę pierwszą (pierwsza to 2, druga to 3 itd.
-print getPrimes(1,10) # zwraca od 1-szej do 10-tej liczby pierwszej
+#gen_stats(2000) # PS zwróć uwagę że są jakieś wzorki na wykresach
 
+vecRsa = Vector.createMainVector(188198812920607963838697239461650439807163563379417382700763356422988859715234665485319060606504743045317388011303396716199692321205734031879550656996221305168759307650257059)
+distOnLine, distFromLine = vecRsa.getVectors(Vector(472772146107435302536223071973048224632914695302097116459852171130520711256363590397527))
+print distFromLine;
 
-# start = time.time() # in sec
-# print "work time","%.5f" % (float(time.time()) - start),"[s]"
-
-gen_stats(20) # PS zwróć uwagę że są jakieś wzorki na wykresach
-#time.sleep( 10 )
 
 conn.close()
 
 
+#pozostaje do sprawdzenia jeszcze moja metoda
+#wpisac na sztywno liczby RSA i zobaczyc jak blisko bedzie ktorys z dzielnikow

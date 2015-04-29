@@ -282,7 +282,6 @@ def generateGauseMixture(number):
     return gmm
 
 
-
 class GeneticAlgorithm(object):
     target_val = 0.0
     population_size = 1e6

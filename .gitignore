@@ -1,8 +1,10 @@
 # my
-.idea/*
-prime_numbers/*
-result/*
-data/*
+.idea/
+prime_numbers/
+result/
+data/
+test/
+decint_041/
 !data/primes1.txt
 !data/primes2.txt
 !data/primes3.txt

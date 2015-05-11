@@ -20,11 +20,15 @@ THREE = decimal.Decimal(3)
 FOUR = decimal.Decimal(4)
 
 class Conf:
-    generate_samples = 1e3
     gmm_components = 4
     gmm_covariance_type = 'diag'               #   'spherical', 'tied', 'diag', 'full'
     gmm_n_iter = 100
-
+    genetic_genPopulation = '_generatePopulation1'
+    genetic_rate = "_rate1"
+    genetic_crossover = "_crossover1"
+    genetic_mutataion = "_mutation1"
+    genetic_selection = "_selection1"
+    work_getLine = 'getLine1'
 
 decimal.getcontext().prec = 50
 
@@ -157,7 +161,11 @@ class UlamSpiral(object):       #tested to 1e9
         raise NameError("Error: UlamSpiral.toXY(" + str(number) +") failed")
 
     @staticmethod
-    def getNumber(x,y):
+    def getNumber(x = None, y = None, vector=None):
+        if vector != None:
+            x = vector.X
+            y = vector.Y
+
         if x == y == ZERO:
             return ONE
         elif abs(y) >= abs(x):
@@ -171,23 +179,38 @@ class UlamSpiral(object):       #tested to 1e9
             else:
                 return FOUR*x*x - x + ONE - y
 
-    @staticmethod
-    def getNumber(vec):
-        return UlamSpiral.getNumber(vec.X, vec.Y)
+    # @staticmethod
+    # def getNumber(vec):
+    #     return UlamSpiral.getNumber(vec.X, vec.Y)
 
 class Vector(object):
-    def __init__(self, number):
-        self.X, self.Y = UlamSpiral.getXY(number)
+    def __init__(self, number = None, x=None, y=None ):
+        if number:
+            self.X, self.Y = UlamSpiral.getXY(number)
+        elif x  != None and y != None:
+            self.X, self.Y = x, y
+        else:
+            raise AttributeError()
+
     def getLength(self):
         return (self.X**2 + self.Y**2).sqrt()
 
     def __str__(self):
-        return "< " + str(self.X) + ", " + str(self.Y) +" >"
+        return "<" + str(self.X) + "," + str(self.Y) +">"
+    def __repr__(self):
+        return self.__str__()
+
+    def __add__(self, other):
+        if type(other) == type(self):
+            return Vector(x=(self.X + other.X), y=(self.Y + other.Y))
+
+    def __div__(self, other):
+        if isinstance( other, ( int, long ) ):
+            return Vector(x=(self.X / other), y=(self.Y / other))
 
 class Work(object):
-    def __init__(self, val):
-        if val == 'getLine1':
-            self.getLine = self.__getLine1
+    def __init__(self):
+        self.getLine = self.__getattribute__('getLine1')
 
     def getDistances(self, rsaVec, primeVec):
         lineRsa = self.getLine(rsaVec.X, rsaVec.Y)
@@ -208,7 +231,7 @@ class Work(object):
         pass
 
 
-    def __getLine1(self, x, y):
+    def getLine1(self, x, y):
         if x > 0:
             return Line(1, -1, y - x)
         else:
@@ -226,101 +249,178 @@ def test():
     work = Work('getLine1')
     print work.getDistances(rsaVec, prime1Vec)
 
-def generateGauseMixture(number):
-    db = DBconn()
-    work = Work('getLine1')
-
-    start, end = db.getRange(number)
-    print time.ctime(), "db.getRange", start, end
-    samples = np.random.randint(start, end, size=(Conf.generate_samples, 2))
-
-    # primes = db.getRange2(number)
-    # print time.ctime(), "got primes ", len(primes)
-    # samples = np.random.randint(len(primes), size=(Conf.generate_samples, 2))
-
-    print time.ctime(), "random integers "
-    testData = []
-
-    for el in samples:
-        p1 = db.getPrimes(el[0])
-        p2 = db.getPrimes(el[1])
-        # p1 = primes[el[0]]
-        # p2 = primes[el[1]]
-        try:
-            rsaVec = Vector(p1 * p2)
-            prime1Vec = Vector(p1)
-            prime2Vec = Vector(p2)
-        except Exception as e:
-            print e
-            print p1, p2, p1 * p2, type(p1), type(p2),type(64888757)
-
-            p1 = p1.item()
-            p2 = p2.item()
-
-            rsaVec = Vector(p1 * p2)
-            prime1Vec = Vector(p1)
-            prime2Vec = Vector(p2)
-
-        testData.append(work.getDistances(rsaVec, prime1Vec))
-        testData.append(work.getDistances(rsaVec, prime2Vec))
-
-    print time.ctime(), "gmm start fit"
-    gmm = GMM(n_components = Conf.gmm_components, covariance_type = Conf.gmm_covariance_type, n_iter = Conf.gmm_n_iter)
-    print gmm.fit(testData)
-
-    print gmm.get_params()
-    print 'means'
-    print gmm.means_
-    print 'covaras'
-    print gmm.covars_
-    print 'weights'
-    print gmm.weights_
-    print 'sample'
-    print gmm.sample(10)
-
-    db.conn.close()
-    return gmm
-
 
 class GeneticAlgorithm(object):
-    target_val = 0.0
-    population_size = 1e6
-    probability_crossover = 0.1
-    probability_mutation = 0.1
+    target_val = 0.0        # lower better but must by >= 0
+    population_size = int(1e4)
+    probability_crossover = 0.7
+    probability_mutation = 0.4
+    add_new_population_percent = 0.001
 
-    def __init__(self, gmm):
-        self.gmm = gmm
+    def __init__(self, numberToFactorize):
+        #self.gmm = gmm
+        self.number =  decimal.Decimal(numberToFactorize)
 
-    def generatePopulation(self, number):
-        return self.gmm.sample(number)
+        x, y = UlamSpiral.getXY(self.number.sqrt().to_integral_exact(decimal.ROUND_CEILING))
+        self.searchBorder = max(abs(x), abs(y)) + 1 # int(sqrt(number to factorize)) is inside of the border
 
-    def rate(self, subject):
-        return 0.0
+        if (Conf.genetic_genPopulation == 'generatePopulation2'):
+            self.gmm = self._generateGauseMixture(numberToFactorize)
+        self.generatePopulation = self.__getattribute__(Conf.genetic_genPopulation)
+        self.rate = self.__getattribute__(Conf.genetic_rate)
+        self.crossover = self.__getattribute__(Conf.genetic_crossover)
+        self.mutation = self.__getattribute__(Conf.genetic_mutataion)
+        self.selection = self.__getattribute__(Conf.genetic_selection)
 
-    def crossover(self, obj1, obj2):
-        return obj1, obj2
+        self.fitness = sys.maxint
+        self.results = []
 
-    def mutation(self, obj):
-        return obj
 
-    def selection(self, population):
-        self.fitness = 0.0
-        return population
+    """ GENERATE POPULATION  """
+    def _generatePopulation1(self, size):
+        vectors = []
+        for _ in xrange(size):
+            x1, y1  = numpy.random.randint(-1 * self.searchBorder, self.searchBorder + 1, size=2)
+            vectors.append(Vector(x=x1, y=y1))
+        return vectors
+
+    def _generatePopulation2(self, size):
+        pass
+    def _generateGauseMixture(number):
+        print time.ctime(), "start generate gause mixture"
+        db = DBconn()
+        work = Work('getLine1')
+
+        start, end = db.getRange(number)
+
+        samples = np.random.randint(start, end, size=(Conf.generate_samples, 2))
+
+        testData = []
+        for el in samples:
+            p1 = db.getPrimes(el[0])
+            p2 = db.getPrimes(el[1])
+            try:
+                rsaVec = Vector(p1 * p2)
+                prime1Vec = Vector(p1)
+                prime2Vec = Vector(p2)
+            except Exception as e:
+                print e
+                print p1, p2, p1 * p2, type(p1), type(p2),type(64888757)
+
+                p1 = p1.item()
+                p2 = p2.item()
+
+                rsaVec = Vector(p1 * p2)
+                prime1Vec = Vector(p1)
+                prime2Vec = Vector(p2)
+
+            testData.append(work.getDistances(rsaVec, prime1Vec))
+            testData.append(work.getDistances(rsaVec, prime2Vec))
+
+        gmm = GMM(n_components = Conf.gmm_components, covariance_type = Conf.gmm_covariance_type, n_iter = Conf.gmm_n_iter)
+        # print gmm.fit(testData)
+        #
+        # print gmm.get_params()
+        # print 'means'
+        # print gmm.means_
+        # print 'covaras'
+        # print gmm.covars_
+        # print 'weights'
+        # print gmm.weights_
+        # print 'sample'
+        # print gmm.sample(10)
+
+        db.conn.close()
+        print time.ctime(), "end generate gause mixture"
+        return gmm
+
+    """ RATE """
+    def _rate1(self, vec):
+        number = UlamSpiral.getNumber(vector=vec)
+        if number == self.number or number == 1:
+            return sys.maxint
+
+        value = self.number % number
+        if value == 0:
+            self.fitness = 0
+            self.results.append(number)
+
+        return value
+
+    """ CROSSOVER """
+    def _crossover1(self, vec1, vec2):
+        shift = 5
+        shared = 2**shift -1
+
+        if random.random() > 0.5:
+            x = ((vec1.X >> shift) << shift) + (vec2.X & shared)
+        else:
+            x = ((vec2.X >> shift) << shift) + (vec1.X & shared)
+
+        if random.random() > 0.5:
+            y = ((vec1.Y >> shift) << shift) + (vec2.Y & shared)
+        else:
+            y = ((vec2.Y >> shift) << shift) + (vec1.Y & shared)
+
+        return (vec1 + vec2) /2 , Vector(x=x, y=y)
+
+    """ MUTATION """
+    def _mutation1(self, vec):
+        x = int(vec.X)
+        xbits = math.floor(numpy.log2(abs(x) + 1) + 1)
+        change =  numpy.random.randint(xbits, size=numpy.random.randint(xbits))
+        for nbit in change:
+            x ^= 2 ** nbit
+
+        y = int(vec.X)
+        ybits = math.floor(numpy.log2(abs(y) + 1) + 1)
+        change =  numpy.random.randint(ybits, size=numpy.random.randint(ybits))
+        for nbit in change:
+            y ^= 2 ** nbit
+        return Vector(x=x, y=y)
+
+    """ SELECTION """
+    def _selection1(self, vectors):
+        temp = []
+        newPopulation = self._generatePopulation1(int(math.ceil(GeneticAlgorithm.population_size * GeneticAlgorithm.add_new_population_percent)))
+        vectors += newPopulation
+        for vec in vectors:
+            temp.append([vec, self.rate(vec)])
+
+        sortedIter = sorted(temp, key = lambda x: x[1])
+
+        i = 0
+        ret = []
+        for item in sortedIter:
+            if item[0].X <= self.searchBorder and item[0].Y <= self.searchBorder:
+                ret.append(item[0])
+                i += 1
+                if i >= GeneticAlgorithm.population_size:
+                    break
+        if len(ret) < GeneticAlgorithm.population_size:
+            newPopulation = self._generatePopulation1(math.ceil(GeneticAlgorithm.population_size - i))
+            ret += newPopulation
+        return ret
+    """ END of prototypes of function """
 
     def run(self):
-        population = [] #self.generatePopulation(GeneticAlgorithm.population_size)
+        print time.ctime(), "- start genetic alg"
+        vectors = self.generatePopulation(GeneticAlgorithm.population_size)
         while True:
-            population = self.selection(population)
+            vectors = self.selection(vectors)
             if GeneticAlgorithm.target_val >= self.fitness : break
-            i, size = 0, len(population)
-            while i < size:
+
+            size = len(vectors)
+            for i in xrange(size):
                 if random.random() < GeneticAlgorithm.probability_crossover:
-                    ch1, ch2 = self.crossover(population[i], population[ (i+1)%size])
-                    population.append(ch1)
-                    population.append(ch2)
+                    ch1, ch2 = self.crossover(vectors[i], vectors[ (i+1)%size])
+                    vectors.append(ch1)
+                    vectors.append(ch2)
                 elif random.random() < GeneticAlgorithm.probability_mutation:
-                    population[i] = self.mutation(population[i])
-                i += 1
+                    vectors.append(self.mutation(vectors[i]))
+        print time.ctime(), "- end genetic alg"
+        return self.fitness, self.results
+
 
 
 
@@ -329,5 +429,12 @@ class GeneticAlgorithm(object):
 # print time.ctime(), "end "
 
 
-alg = GeneticAlgorithm("sas")
+alg = GeneticAlgorithm(5018719) #Factorization: 1823 * 2753 = 5018719
+#alg = GeneticAlgorithm(695903367050368781) # 756067723 * 920424647 = 695903367050368781
 alg.run()
+#print alg.fitness
+print alg.results
+
+
+
+

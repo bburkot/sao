@@ -14,8 +14,9 @@ import decimal
 
 ZERO = decimal.Decimal(0)
 ONE = decimal.Decimal(1)
-MINUSONE = decimal.Decimal(-1)
+MINUS_ONE = decimal.Decimal(-1)
 TWO = decimal.Decimal(2)
+MINUS_TWO = decimal.Decimal(-2)
 THREE = decimal.Decimal(3)
 FOUR = decimal.Decimal(4)
 
@@ -29,6 +30,7 @@ class Conf:
     genetic_mutataion = "_mutation1"
     genetic_selection = "_selection1"
     work_getLine = 'getLine1'
+    generate_samples = 1e5
 
 decimal.getcontext().prec = 50
 
@@ -209,27 +211,82 @@ class Vector(object):
             return Vector(x=(self.X / other), y=(self.Y / other))
 
 class Work(object):
-    def __init__(self):
-        self.getLine = self.__getattribute__('getLine1')
+    def __init__(self, rsaVec):
+        self.getLine = self.__getattribute__(Conf.work_getLine)
+        self.lineRsa = self.getLine(rsaVec.X, rsaVec.Y)
 
     def getDistances(self, rsaVec, primeVec):
-        lineRsa = self.getLine(rsaVec.X, rsaVec.Y)
-        orthogonalLine = Line(MINUSONE / lineRsa.A, MINUSONE, primeVec.Y + (ONE * primeVec.X) / lineRsa.A )
-
+        orthogonalLine = Line(MINUS_ONE / self.lineRsa.A, MINUS_ONE, primeVec.Y + (ONE * primeVec.X) / self.lineRsa.A )
         # print lineRsa
         # print orthogonalLine
 
         d1 = orthogonalLine.calcDistance(rsaVec.X, rsaVec.Y) / rsaVec.getLength()
-        d2 = lineRsa.calcDistance(primeVec.X, primeVec.Y) / rsaVec.getLength()
-
-        if primeVec.Y >= lineRsa.calcValue(primeVec.X):
+        d2 = self.lineRsa.calcDistance(primeVec.X, primeVec.Y) / rsaVec.getLength()
+        if primeVec.Y >= self.lineRsa.calcValue(primeVec.X):
             return [d1, d2]
         else:
             return [d1, -d2]
 
     def getVector(self, rsaVec, d1, d2):
-        pass
 
+        # {
+        #     sqrt( (x1 - xR)**2 + (y1 - yR)**2 ) = d1
+        #     Ax + By +C = 0                                # B = B2 = -1
+        #     sqrt( (x2 - x1)**2 + (y2 - y1)**2 ) = d2
+        #     A2x + B2y +C2 = 0
+        # }
+
+        d1 = decimal.Decimal(d1) * decimal.Decimal(rsaVec.getLength())
+        d2 = decimal.Decimal(d2) * decimal.Decimal(rsaVec.getLength())
+
+        # x1
+        x = rsaVec.X
+        y = rsaVec.Y
+        A = decimal.Decimal(self.lineRsa.A)
+        C = decimal.Decimal(self.lineRsa.C)
+        alfa = ONE + A ** 2
+        beta = MINUS_TWO * x + TWO * A * C - TWO * A * y
+        gama = x**2 + C**2 + C * y + y**2 - d1**2
+
+        delta = beta**2 - FOUR * alfa * gama
+
+        if x > 0:
+            x = (MINUS_ONE * beta - decimal.Decimal(math.sqrt(delta))) / (TWO * alfa)
+        else:
+            x = (MINUS_ONE * beta + decimal.Decimal(math.sqrt(delta))) / (TWO * alfa)
+        y = A * x + C
+
+        # x2
+        orthogonalLine = Line(MINUS_ONE / A, MINUS_ONE, y + (ONE * x) / self.lineRsa.A )
+        A = decimal.Decimal(orthogonalLine.A)
+        C = decimal.Decimal(orthogonalLine.C)
+
+        alfa = ONE + A ** 2
+        beta = MINUS_TWO * x + TWO * A * C - TWO * A * y
+        gama = x**2 + C**2 + C * y + y**2 - d2**2
+
+        delta = beta**2 - 4 * alfa * gama
+
+        x21 = (MINUS_ONE * beta - decimal.Decimal(math.sqrt(delta))) / (TWO * alfa)
+        x22 = (MINUS_ONE * beta + decimal.Decimal(math.sqrt(delta))) / (TWO * alfa)
+        y21 = A * x21 + C
+        y22 = A * x22 + C
+
+        x21 = decimal.Decimal(x21.to_integral_exact(decimal.ROUND_CEILING))
+        x22 = decimal.Decimal(x22.to_integral_exact(decimal.ROUND_CEILING))
+        y21 = decimal.Decimal(y21.to_integral_exact(decimal.ROUND_CEILING))
+        y22 = decimal.Decimal(y21.to_integral_exact(decimal.ROUND_CEILING))
+
+        if (d2 >= 0):
+            if y21 < y22:
+                return Vector(x=x21, y=y21)
+            else:
+                return Vector(x=x22, y=y22)
+        else:
+            if y21 > y22:
+                return Vector(x=x21, y=y21)
+            else:
+                return Vector(x=x22, y=y22)
 
     def getLine1(self, x, y):
         if x > 0:
@@ -246,7 +303,7 @@ def test():
     rsaVec = Vector(rsa)
     prime1Vec = Vector(prime1)
 
-    work = Work('getLine1')
+    work = Work( rsaVec)
     print work.getDistances(rsaVec, prime1Vec)
 
 
@@ -264,8 +321,9 @@ class GeneticAlgorithm(object):
         x, y = UlamSpiral.getXY(self.number.sqrt().to_integral_exact(decimal.ROUND_CEILING))
         self.searchBorder = max(abs(x), abs(y)) + 1 # int(sqrt(number to factorize)) is inside of the border
 
-        if (Conf.genetic_genPopulation == 'generatePopulation2'):
+        if (Conf.genetic_genPopulation == '_generatePopulation2'):
             self.gmm = self._generateGauseMixture(numberToFactorize)
+            self.rsaVector = Vector(number=numberToFactorize)
         self.generatePopulation = self.__getattribute__(Conf.genetic_genPopulation)
         self.rate = self.__getattribute__(Conf.genetic_rate)
         self.crossover = self.__getattribute__(Conf.genetic_crossover)
@@ -285,11 +343,15 @@ class GeneticAlgorithm(object):
         return vectors
 
     def _generatePopulation2(self, size):
-        pass
-    def _generateGauseMixture(number):
+        samples = self.gmm.sample(size)
+        population = []
+        for sample in samples:
+           population.append(self.work.getVector(self.rsaVector, sample[0], sample[1]))
+        return population
+    def _generateGauseMixture(self,number):
         print time.ctime(), "start generate gause mixture"
         db = DBconn()
-        work = Work('getLine1')
+        self.work = Work(Vector(number=number))
 
         start, end = db.getRange(number)
 
@@ -314,11 +376,11 @@ class GeneticAlgorithm(object):
                 prime1Vec = Vector(p1)
                 prime2Vec = Vector(p2)
 
-            testData.append(work.getDistances(rsaVec, prime1Vec))
-            testData.append(work.getDistances(rsaVec, prime2Vec))
+            testData.append(self.work.getDistances(rsaVec, prime1Vec))
+            testData.append(self.work.getDistances(rsaVec, prime2Vec))
 
         gmm = GMM(n_components = Conf.gmm_components, covariance_type = Conf.gmm_covariance_type, n_iter = Conf.gmm_n_iter)
-        # print gmm.fit(testData)
+        gmm.fit(testData)
         #
         # print gmm.get_params()
         # print 'means'
@@ -328,7 +390,7 @@ class GeneticAlgorithm(object):
         # print 'weights'
         # print gmm.weights_
         # print 'sample'
-        # print gmm.sample(10)
+        print gmm.sample(10)
 
         db.conn.close()
         print time.ctime(), "end generate gause mixture"
@@ -340,7 +402,8 @@ class GeneticAlgorithm(object):
         if number == self.number or number == 1:
             return sys.maxint
 
-        value = self.number % number
+        value = (self.number / number) % 1
+        #print value
         if value == 0:
             self.fitness = 0
             self.results.append(number)
@@ -362,7 +425,9 @@ class GeneticAlgorithm(object):
         else:
             y = ((vec2.Y >> shift) << shift) + (vec1.Y & shared)
 
-        return (vec1 + vec2) /2 , Vector(x=x, y=y)
+        tuple = np.random.choice([vec1.X, vec1.Y, vec2.X, vec2.Y], size=2, replace=False )
+
+        return Vector(x=tuple[0], y=tuple[1]) , Vector(x=x, y=y)
 
     """ MUTATION """
     def _mutation1(self, vec):
@@ -422,19 +487,14 @@ class GeneticAlgorithm(object):
         return self.fitness, self.results
 
 
+def prog():
+    alg = GeneticAlgorithm(5018719) #Factorization: 1823 * 2753 = 5018719
+    #alg = GeneticAlgorithm(695903367050368781) # 756067723 * 920424647 = 695903367050368781
+    alg.run()
+    #print alg.fitness
+    print alg.results
 
 
-# print time.ctime(), "start "
-# generateGauseMixture(3846564564645645646546468798909808908908090890890768566354424214264576890000000000000000000000000000000000000000000000000000000000242352)
-# print time.ctime(), "end "
-
-
-alg = GeneticAlgorithm(5018719) #Factorization: 1823 * 2753 = 5018719
-#alg = GeneticAlgorithm(695903367050368781) # 756067723 * 920424647 = 695903367050368781
-alg.run()
-#print alg.fitness
-print alg.results
-
-
+prog()
 
 
